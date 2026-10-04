@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "codeguardllm"
+version = "0.1.0"
+description = "Reproducible KGW watermark experiments on Python code"
+requires-python = ">=3.11"
+dependencies = ["PyYAML==6.0.2"]
+
+[project.optional-dependencies]
+ml = ["torch==2.8.0", "transformers==4.51.3", "numpy==2.2.5"]
+data = ["datasets==3.5.0"]
+
+[project.scripts]
+codeguard = "codeguard.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

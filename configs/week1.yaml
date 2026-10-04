@@ -1,0 +1,30 @@
+name: week1-qwen-smoke
+output_dir: ../runs/week1
+markllm_path: ../.deps/MarkLLM
+dataset:
+  source: local
+  path: ../data/dev.jsonl
+  limit: 10
+model:
+  name: Qwen/Qwen2.5-Coder-1.5B-Instruct
+  revision: 2e1fd397ee46e1388853d2af2c993145b0f1098a
+  device: cuda
+  dtype: float16
+generation:
+  seeds: [42]
+  temperature: 0.8
+  top_p: 0.95
+  max_new_tokens: 512
+watermark:
+  gamma: 0.25
+  delta: 2.0
+  hash_key: 918273645
+  prefix_length: 1
+  f_scheme: time
+  window_scheme: left
+  z_threshold: 4.0
+  ignore_repeated_ngrams: true
+evaluation:
+  image: codeguard-eval:week1
+  timeout_seconds: 5
+  memory_mb: 256

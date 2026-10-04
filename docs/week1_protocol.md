@@ -1,0 +1,82 @@
+# Week-one protocol
+
+## Question and scope
+
+Can the infrastructure generate Python with KGW, preserve experiment identity across
+interrupted sessions, and evaluate correctness separately from watermark evidence?
+Week one validates plumbing. It does not establish reliable watermark detection.
+
+## Five-day implementation sequence
+
+1. Set up Python, pinned MarkLLM/model revisions, configuration, and separate development data.
+2. Integrate chat prompting, clean/watermarked sampling, and prompt-free output extraction.
+3. Add token scoring, repeated-bigram filtering, manifests, and interruption recovery.
+4. Add isolated correctness evaluation and end-to-end integration tests.
+5. Run the 10-task cloud pilot, inspect failures, measure throughput, and export results.
+
+The repository supplies steps 1–4 and the notebook for step 5. The real pilot requires
+a GPU session; Docker tests require a running Linux Docker engine.
+
+## Fixed initial choices
+
+| Parameter | Value |
+|---|---|
+| Model | Qwen/Qwen2.5-Coder-1.5B-Instruct, revision in YAML |
+| Dataset | 10 project-authored development tasks |
+| Seeds | 42; actual per-task seed derived from task ID and seed |
+| Conditions | Clean and KGW, same prompt and sampling settings |
+| Sampling | temperature 0.8, top-p 0.95, top-k disabled |
+| Maximum output | 512 new tokens, with truncation recorded |
+| KGW | gamma 0.25, delta 2.0, h=1, time/left scheme |
+| Key | Fixed research key in YAML, not a production secret |
+| Detection | Z > 4 reference threshold, repeated bigrams ignored |
+| Quality | One sampled completion per task/condition; fraction passing all tests |
+
+The KGW adapter uses the exact upstream green lists and the model output vocabulary
+size. It rejects tokenizer IDs outside that vocabulary. Generation and detection
+must use the same random-number backend; changing between CUDA and CPU changes
+the partitions. This property is recorded, not silently normalized away.
+
+For text-only detection, the first token is unscored because its preceding generation
+context is unavailable. T is the number of scored distinct bigrams when filtering is
+enabled, not the total text length. Green-list size is rounded down upstream; the
+implementation retains upstream gamma in the nominal Z-score. Treat the Z > 4 decision
+as uncalibrated on code. No normal-null false-positive guarantee is claimed.
+
+## Output handling and accounting
+
+- A single Python fenced block is extracted, or the whole unfenced continuation.
+- Internal whitespace is preserved. There is no code repair or automatic formatting.
+- Complete function definitions are requested; bodies alone fail the entry-point check.
+- Raw continuation and extracted code are both retained and independently scored.
+- Text re-tokenization can differ from generation token IDs; both artifacts are saved
+  for later analysis. Special tokens are removed from decoded text.
+- Invalid syntax and extraction failures remain in quality denominators.
+- Unexpected generation failures stop the run; retries resume missing samples with
+  the same task seed. There is no automatic best-of-N retry selection.
+- Evaluation validates references first. Infrastructure failures stop evaluation.
+- Partial evaluations show null Pass@1 until all expected samples are evaluated.
+
+## Acceptance checks
+
+- The CLI validates ten tasks and plans exactly twenty completions.
+- Generation resumes after interruption without duplicate samples.
+- Modified configurations, task snapshots, or runtime metadata are rejected.
+- The real KGW logits processor and detector agree on synthetic token sequences.
+- A wrong-key control loses the synthetic watermark signal.
+- Repeated bigrams and short inputs have explicit, tested behavior.
+- A tiny offline Transformers model exercises actual clean and watermarked generation.
+- Docker evaluates reference solutions, rejects incorrect programs and early exits,
+  and terminates infinite loops.
+- A real Qwen GPU pilot creates twenty records and can export them for local evaluation.
+
+## Preparing week two
+
+Expand development prompts to 20–30 tasks and tune delta on these tasks, not HumanEval.
+Record a frozen protocol before using `configs/humaneval.yaml`. HumanEval's tests and
+reference solutions are public but must remain withheld from generation prompts.
+Later work adds human negative controls, ROC/AUC, code-length strata, repeated seeds,
+problem-level confidence intervals, fingerprinting, and controlled edits.
+
+Estimate runtime from measured per-condition throughput; do not extrapolate from
+model size alone. On a new GPU or dependency environment, start a separate run.
