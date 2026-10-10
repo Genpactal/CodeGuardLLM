@@ -1,4 +1,4 @@
-"""Pilot summaries. Missing evaluations never become zero Pass@1 by accident."""
+"""Run summaries. Missing evaluations never become zero Pass@1 by accident."""
 
 from collections import Counter
 from pathlib import Path
@@ -22,7 +22,7 @@ def summarize(directory):
                 raise ValueError("Generation changed after evaluation")
         summary = {"experiment_id": manifest["experiment_id"], "expected_samples": manifest["expected_samples"],
                    "generated_samples": len(rows), "evaluated_samples": len(evaluations),
-                   "scope": "Descriptive pilot results; no calibration, confidence intervals, or attribution yet",
+                   "scope": "Descriptive run results at a fixed threshold; no calibration or confidence intervals",
                    "conditions": {}}
         for condition in ("clean", "watermarked"):
             selected = [row for row in rows if row["condition"] == condition]

@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class DataConfigTests(unittest.TestCase):
     def test_authored_development_references_match_their_tests(self):
-        config = load_config(ROOT / "configs/week1.yaml")
+        config = load_config(ROOT / "configs/pilot.yaml")
         tasks = load_tasks(config["dataset"])
         self.assertEqual(len(tasks), 10)
         for task in tasks:
@@ -27,13 +27,13 @@ class DataConfigTests(unittest.TestCase):
                 namespace["check"](namespace[task["entry_point"]])
 
     def test_duplicate_tasks_rejected(self):
-        config = load_config(ROOT / "configs/week1.yaml")
+        config = load_config(ROOT / "configs/pilot.yaml")
         task = load_tasks(config["dataset"])[0]
         with self.assertRaisesRegex(ValueError, "Duplicate task"):
             validate_tasks([task, task])
 
     def test_invalid_protocol_options_rejected(self):
-        raw = yaml.safe_load((ROOT / "configs/week1.yaml").read_text())
+        raw = yaml.safe_load((ROOT / "configs/pilot.yaml").read_text())
         cases = [("watermark", "gamma", 1.0), ("generation", "seeds", [42, 42]),
                  ("model", "revision", "main"), ("generation", "temperature", 0),
                  ("watermark", "prefix_length", 4), ("evaluation", "memory_mb", -1)]

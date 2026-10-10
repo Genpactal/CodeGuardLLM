@@ -11,11 +11,11 @@ from .data import load_tasks
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(prog="codeguard", description="Week-one KGW code watermark experiments")
+    parser = argparse.ArgumentParser(prog="codeguard", description="KGW code watermark experiments")
     commands = parser.add_subparsers(dest="command", required=True)
     for name in ("validate", "generate", "detect"):
         sub = commands.add_parser(name)
-        sub.add_argument("--config", default="configs/week1.yaml")
+        sub.add_argument("--config", default="configs/local.yaml")
         if name == "validate":
             sub.add_argument("--check-markllm", action="store_true")
         if name == "generate":
@@ -24,7 +24,7 @@ def main(argv=None):
             sub.add_argument("--file", type=Path, required=True, help="Generated code only, without its input prompt")
     for name in ("evaluate", "summarize"):
         sub = commands.add_parser(name)
-        sub.add_argument("--run-dir", type=Path, default=Path("runs/week1"))
+        sub.add_argument("--run-dir", type=Path, default=Path("runs/local/humaneval/baseline"))
     args = parser.parse_args(argv)
     try:
         if args.command in ("validate", "generate", "detect"):

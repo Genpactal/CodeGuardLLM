@@ -1,4 +1,5 @@
 .venv/
+.venv-gpu/
 .deps/
 .tmp/
 __pycache__/

@@ -8,14 +8,24 @@ from unittest.mock import patch
 
 from codeguard.config import load_config
 from codeguard.data import load_tasks
-from codeguard.evaluation import DockerEvaluator
+from codeguard.evaluation import DockerEvaluator, prepare_docker
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class EvaluatorContractTests(unittest.TestCase):
+    def test_prepare_checks_linux_and_builds_missing_image(self):
+        replies = [subprocess.CompletedProcess([], 0, 'linux\n', ''),
+                   subprocess.CompletedProcess([], 1, '', ''), subprocess.CompletedProcess([], 0)]
+        with patch('codeguard.evaluation.subprocess.run', side_effect=replies) as run:
+            prepare_docker('codeguard-eval:v1')
+            self.assertIn('build', run.call_args_list[-1].args[0])
+        with patch('codeguard.evaluation.subprocess.run', return_value=subprocess.CompletedProcess([], 0, 'windows\n', '')):
+            with self.assertRaisesRegex(RuntimeError, 'Linux'):
+                prepare_docker('codeguard-eval:v1')
+
     def setUp(self):
-        self.settings = load_config(ROOT / "configs/week1.yaml")["evaluation"]
+        self.settings = load_config(ROOT / "configs/pilot.yaml")["evaluation"]
 
     def test_container_has_no_mounts_or_network_and_pins_image_id(self):
         with patch("codeguard.evaluation.subprocess.run", return_value=subprocess.CompletedProcess([], 0, "sha256:abc\n", "")):
@@ -40,7 +50,7 @@ class EvaluatorContractTests(unittest.TestCase):
 class DockerSmokeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.config = load_config(ROOT / "configs/week1.yaml")
+        cls.config = load_config(ROOT / "configs/pilot.yaml")
         cls.evaluator = DockerEvaluator(cls.config["evaluation"])
 
     def test_all_development_references(self):

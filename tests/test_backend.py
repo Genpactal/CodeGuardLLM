@@ -41,7 +41,7 @@ class ToyTokenizer:
 class BackendTests(unittest.TestCase):
     def test_actual_generate_respects_continuation_and_seeds(self):
         from transformers import GPT2Config, GPT2LMHeadModel
-        config = load_config(ROOT / "configs/week1.yaml")
+        config = load_config(ROOT / "configs/pilot.yaml")
         config["model"].update(device="cpu", dtype="float32")
         config["generation"]["max_new_tokens"] = 8
         toy_config = GPT2Config(vocab_size=128, n_positions=64, n_embd=32, n_layer=1, n_head=2,

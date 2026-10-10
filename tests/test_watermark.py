@@ -27,7 +27,7 @@ class WatermarkTests(unittest.TestCase):
     def setUpClass(cls):
         import torch
         cls.torch = torch
-        cls.config = load_config(ROOT / "configs/week1.yaml")
+        cls.config = load_config(ROOT / "configs/pilot.yaml")
         cls.settings = cls.config["watermark"]
 
     def adapter(self, **overrides):

@@ -52,7 +52,7 @@ class PipelineTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.config = load_config(ROOT / "configs/week1.yaml")
+        self.config = load_config(ROOT / "configs/pilot.yaml")
         self.config["output_dir"] = self.temp.name
         self.config["dataset"]["limit"] = 2
         self.backend = FakeBackend(self.config)

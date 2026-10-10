@@ -1,13 +1,10 @@
-# Later-stage configuration. Do not tune parameters on this final benchmark.
-name: humaneval-qwen
-output_dir: ../runs/humaneval
+name: pilot-qwen-smoke
+output_dir: ../runs/pilot
 markllm_path: ../.deps/MarkLLM
 dataset:
-  source: huggingface
-  name: openai/openai_humaneval
-  revision: 7dce6050a7d6d172f3cc5c32aa97f52fa1a2e544
-  split: test
-  limit: 164
+  source: local
+  path: ../data/dev.jsonl
+  limit: 10
 model:
   name: Qwen/Qwen2.5-Coder-1.5B-Instruct
   revision: 2e1fd397ee46e1388853d2af2c993145b0f1098a
@@ -28,6 +25,6 @@ watermark:
   z_threshold: 4.0
   ignore_repeated_ngrams: true
 evaluation:
-  image: codeguard-eval:week1
+  image: codeguard-eval:v1
   timeout_seconds: 5
   memory_mb: 256

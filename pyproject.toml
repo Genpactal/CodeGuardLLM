@@ -12,6 +12,8 @@ dependencies = ["PyYAML==6.0.2"]
 [project.optional-dependencies]
 ml = ["torch==2.8.0", "transformers==4.51.3", "numpy==2.2.5"]
 data = ["datasets==3.5.0"]
+analysis = ["scikit-learn==1.6.1", "matplotlib==3.10.1"]
+notebook = ["ipykernel>=6.29,<7"]
 
 [project.scripts]
 codeguard = "codeguard.cli:main"

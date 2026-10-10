@@ -1,7 +1,9 @@
 """Docker-only evaluation. There is deliberately no host-execution fallback."""
 
 import json
+import os
 from pathlib import Path
+import shutil
 import subprocess
 import uuid
 
@@ -9,16 +11,55 @@ from .storage import append_record, digest, read_records, run_lock, write_json
 from .pipeline import sample_id
 
 
+def docker_executable():
+    executable = shutil.which('docker')
+    if executable:
+        return executable
+    # Docker Desktop may have been installed after VS Code inherited PATH.
+    if os.name == 'nt':
+        for variable, suffix in (('ProgramFiles', 'Docker/Docker/resources/bin/docker.exe'),
+                                 ('LOCALAPPDATA', 'Programs/DockerDesktop/resources/bin/docker.exe')):
+            base = os.environ.get(variable)
+            if base:
+                candidate = Path(base) / suffix
+                try:
+                    if candidate.is_file():
+                        return str(candidate)
+                except OSError:
+                    pass
+    return 'docker'
+
+
+def prepare_docker(image):
+    """Check the Linux engine and build the project's evaluator if absent."""
+    executable = docker_executable()
+    try:
+        info = subprocess.run([executable, 'info', '--format', '{{.OSType}}'],
+                              capture_output=True, text=True, timeout=20, check=True)
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise RuntimeError('Start Docker Desktop with its Linux engine before correctness evaluation.') from exc
+    if info.stdout.strip() != 'linux':
+        raise RuntimeError('The evaluator requires Docker Linux containers.')
+    inspected = subprocess.run([executable, 'image', 'inspect', image], capture_output=True, timeout=20)
+    if inspected.returncode:
+        sandbox = Path(__file__).resolve().parents[2] / 'sandbox'
+        if not (sandbox / 'Dockerfile').is_file():
+            raise RuntimeError('Evaluator build files are missing; run from the complete project checkout.')
+        print(f'Building evaluator image: {image}', flush=True)
+        subprocess.run([executable, 'build', '-t', image, str(sandbox)], check=True)
+
+
 class DockerEvaluator:
     def __init__(self, settings):
         self.settings = settings
+        self.executable = docker_executable()
         try:
             inspected = subprocess.run(
-                ["docker", "image", "inspect", settings["image"], "--format", "{{.Id}}"],
+                [self.executable, "image", "inspect", settings["image"], "--format", "{{.Id}}"],
                 capture_output=True, text=True, timeout=15, check=True,
             )
         except (OSError, subprocess.SubprocessError) as exc:
-            raise RuntimeError("Docker evaluation is unavailable. Start Docker and build: docker build -t codeguard-eval:week1 sandbox") from exc
+            raise RuntimeError("Docker evaluation is unavailable. Start Docker and build: docker build -t codeguard-eval:v1 sandbox") from exc
         image_id = inspected.stdout.strip()
         if not image_id.startswith("sha256:"):
             raise RuntimeError("Could not resolve the evaluator image ID")
@@ -26,7 +67,7 @@ class DockerEvaluator:
 
     def command(self, container_name):
         return [
-            "docker", "run", "--rm", "--init", "--name", container_name, "--network", "none",
+            self.executable, "run", "--rm", "--init", "--name", container_name, "--network", "none",
             "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
             "--user", "65534:65534", "--pids-limit", "64", "--cpus", "1",
             "--memory", f"{self.settings['memory_mb']}m", "--memory-swap", f"{self.settings['memory_mb']}m",
@@ -43,7 +84,7 @@ class DockerEvaluator:
                                      text=True, timeout=self.settings["timeout_seconds"] + 20, check=False)
         except subprocess.TimeoutExpired as exc:
             # Kill only the container created for this sample; never leave a runaway program.
-            subprocess.run(["docker", "rm", "-f", name], capture_output=True, timeout=10, check=False)
+            subprocess.run([self.executable, "rm", "-f", name], capture_output=True, timeout=10, check=False)
             raise RuntimeError("Container startup or worker timed out; evaluation can be retried") from exc
         if process.returncode:
             # Infrastructure failures are not counted as incorrect code.

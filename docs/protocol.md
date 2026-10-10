@@ -1,12 +1,31 @@
-# Week-one protocol
+# Experiment protocol
+
+## Current HumanEval experiments
+
+Local notebooks use all 164 HumanEval test problems, pinned by dataset revision.
+Each setting produces 328 completions (one clean and one watermarked per task);
+three strengths or three models produce 984 completions per notebook. CPU and
+float32 remain fixed. Results use separate `runs/local/humaneval/` directories.
+Tests and reference solutions are withheld from generation. Strength comparisons
+are descriptive; choosing a strength on these tasks is not held-out evaluation.
+
+The following records the earlier development pilot.
+
+The implemented core workflow includes reference-code detection, ROC/AUROC against
+clean and reference negatives, Docker Pass@1, strength/quality plots, scored-length
+groups, and a written report. Reference controls are complete prompt-plus-canonical
+solutions, retaining docstrings. They are scored once per dataset/detector and
+shared across delta values, without pretending they are independent observations.
+Fingerprinting and robustness are deferred. A report is marked complete only after
+generation, controls, and all correctness evaluations are complete.
 
 ## Question and scope
 
 Can the infrastructure generate Python with KGW, preserve experiment identity across
 interrupted sessions, and evaluate correctness separately from watermark evidence?
-Week one validates plumbing. It does not establish reliable watermark detection.
+The initial pilot validates the pipeline. It does not establish reliable watermark detection.
 
-## Five-day implementation sequence
+## Experiment components
 
 1. Set up Python, pinned MarkLLM/model revisions, configuration, and separate development data.
 2. Integrate chat prompting, clean/watermarked sampling, and prompt-free output extraction.
@@ -59,7 +78,7 @@ as uncalibrated on code. No normal-null false-positive guarantee is claimed.
 
 ## Acceptance checks
 
-- The CLI validates ten tasks and plans exactly twenty completions.
+- The development fixture contains ten tasks and plans twenty completions; the default CLI now plans 328 HumanEval completions.
 - Generation resumes after interruption without duplicate samples.
 - Modified configurations, task snapshots, or runtime metadata are rejected.
 - The real KGW logits processor and detector agree on synthetic token sequences.
@@ -70,13 +89,13 @@ as uncalibrated on code. No normal-null false-positive guarantee is claimed.
   and terminates infinite loops.
 - A real Qwen GPU pilot creates twenty records and can export them for local evaluation.
 
-## Preparing week two
+## Further experiments
 
-Expand development prompts to 20–30 tasks and tune delta on these tasks, not HumanEval.
-Record a frozen protocol before using `configs/humaneval.yaml`. HumanEval's tests and
+For independent tuning, use separate development prompts and freeze settings before
+reporting held-out results. The current HumanEval strength sweep is descriptive. HumanEval's tests and
 reference solutions are public but must remain withheld from generation prompts.
-Later work adds human negative controls, ROC/AUC, code-length strata, repeated seeds,
-problem-level confidence intervals, fingerprinting, and controlled edits.
+Possible follow-up work adds independent human controls, threshold calibration,
+repeated seeds, problem-level confidence intervals, fingerprinting, and controlled edits.
 
 Estimate runtime from measured per-condition throughput; do not extrapolate from
 model size alone. On a new GPU or dependency environment, start a separate run.

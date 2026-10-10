@@ -71,7 +71,7 @@ def load_config(path):
     _number(wm["hash_key"], "hash_key", 1, 2**63 - 1, integer=True)
     _number(wm["z_threshold"], "z_threshold", 0)
     if (wm["prefix_length"], wm["f_scheme"], wm["window_scheme"]) != (1, "time", "left"):
-        raise ValueError("Week 1 supports the single-token time/left KGW scheme only")
+        raise ValueError("This project supports the single-token time/left KGW scheme only")
     if type(wm["ignore_repeated_ngrams"]) is not bool:
         raise ValueError("ignore_repeated_ngrams must be a boolean")
     evaluation = config["evaluation"]
