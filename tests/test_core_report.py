@@ -11,6 +11,7 @@ from codeguard.core_report import core_report, group_statistics, roc_statistics
 from codeguard.evaluation import evaluate_run, load_run
 from codeguard.experiments import comparison_configs
 from codeguard.pipeline import generate
+from codeguard.reporting import detected_correctness
 from test_analysis import ANALYSIS_AVAILABLE, ScoredBackend
 from test_pipeline import FakeEvaluator
 
@@ -92,14 +93,42 @@ class ControlTests(unittest.TestCase):
         self.assertEqual(summary['reference_samples'], 2)  # not six independent controls
         self.assertEqual(len(summary['groups']), 9)
         self.assertTrue(all(r['pass_at_1_change'] is None for r in summary['comparison']))
+        self.assertTrue(all(r['correct_and_detected_rate'] is None for r in summary['detected_correctness']))
         self.assertIn('correctness_pending', (output / 'report.md').read_text(encoding='utf-8'))
         for path in self.paths.values():
             evaluate_run(path, FakeEvaluator, progress=lambda _: None)
         summary = core_report(self.paths, self.controls, output)
         self.assertEqual(summary['status'], 'complete')
         self.assertTrue(all(r['pass_at_1_change'] == 0 for r in summary['comparison']))
-        for name in ('controls_detection.png', 'tradeoff.png', 'roc.csv', 'length_analysis.csv', 'examples.json'):
+        self.assertTrue(all(r['correct_and_detected_rate'] == 0 for r in summary['detected_correctness']))
+        self.assertTrue(all(r['correctness_among_detected'] is None for r in summary['detected_correctness']))
+        for name in ('controls_detection.png', 'tradeoff.png', 'roc.csv', 'length_analysis.csv', 'examples.json', 'detected_correctness.csv'):
             self.assertGreater((output / name).stat().st_size, 10)
+
+
+class DetectedCorrectnessTests(unittest.TestCase):
+    def test_threshold_and_denominators(self):
+        rows = [{'sample_id': str(i), 'code_detection': None if z is None else {'status': 'ok', 'z_score': z}}
+                for i, z in enumerate((5, 6, 4, None, float('nan')))]
+        evaluations = {str(i): {'status': status} for i, status in enumerate(('passed', 'failed', 'passed', 'syntax_error', 'passed'))}
+        stats = detected_correctness(rows, evaluations, 4, 5)
+        self.assertEqual((stats['scored'], stats['detected'], stats['correct_detected']), (3, 2, 1))
+        self.assertEqual(stats['correctness_among_detected'], .5)
+        self.assertEqual(stats['correct_and_detected_rate'], .2)
+
+    def test_no_detections_and_missing_tests_are_not_zero_conditional_accuracy(self):
+        rows = [{'sample_id': 'a', 'code_detection': {'status': 'ok', 'z_score': 4}}]
+        stats = detected_correctness(rows, {'a': {'status': 'passed'}}, 4, 1)
+        self.assertIsNone(stats['correctness_among_detected'])
+        self.assertEqual(stats['correct_and_detected_rate'], 0)
+        rows[0]['code_detection']['z_score'] = 5
+        stats = detected_correctness(rows, {}, 4, 1)
+        self.assertEqual(stats['evaluated_detected'], 0)
+        self.assertIsNone(stats['correctness_among_detected'])
+        self.assertIsNone(stats['correct_and_detected_rate'])
+        stats = detected_correctness(rows, {'a': {'status': 'passed'}}, 4, 2)
+        self.assertIsNone(stats['correctness_among_detected'])
+        self.assertIsNone(stats['correct_and_detected_rate'])
 
 
 @unittest.skipUnless(ANALYSIS_AVAILABLE, 'Install .[analysis]')

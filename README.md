@@ -188,6 +188,14 @@ watermarked rates estimate detection. References are reconstructed as the HumanE
 prompt plus canonical solution, including docstrings; they are never executed during
 scoring. Repeated clean outputs and shared references are not independent controls.
 
+Correctness among detected solutions is the fraction of watermarked outputs with
+Z above the configured threshold that pass all tests. The report also gives the
+fraction of all watermarked outputs that are both detected and correct, including
+unscored outputs in that denominator. Counts accompany the rates: no detections
+means conditional correctness is unavailable, and missing tests remain pending.
+These metrics are saved in `analysis/detected_correctness.csv` and shown in both
+comparison notebooks. A few detected solutions cannot establish general accuracy.
+
 The `analysis/` folder contains `report.md`, `core_summary.json`, CSV tables,
 `controls_detection.png`, `tradeoff.png`, selected examples, and provenance hashes.
 The written report derives its numbers from saved records and discusses KGW,

@@ -44,6 +44,7 @@ def core_report(run_dirs, controls_dir, output):
     output = Path(output)
     detection_report(run_dirs, output)
     comparison, groups, roc_rows, lengths, sample_rows, examples = [], [], [], [], [], []
+    detected_quality = []
     fig, axes = plt.subplots(len(runs), 2, figsize=(11, 3.6 * len(runs)), squeeze=False)
     colors = {'clean': 'tab:blue', 'watermarked': 'tab:orange', 'human_reference': 'tab:green'}
     quality_complete = True
@@ -85,6 +86,8 @@ def core_report(run_dirs, controls_dir, output):
                 axes[index, 1].plot([p['fpr'] for p in points], [p['tpr'] for p in points],
                                     label=f'vs {negative}: AUC={auc:.3f}', color=colors[negative])
         clean, watermarked = (quality['conditions'][c] for c in ('clean', 'watermarked'))
+        detected_quality.append({'run': label, 'delta': wm['delta'],
+                                 **watermarked['detected_correctness']})
         gap = None if clean['pass_at_1'] is None or watermarked['pass_at_1'] is None else watermarked['pass_at_1'] - clean['pass_at_1']
         comparison.append({'run': label, 'delta': wm['delta'], 'auroc_vs_clean': aucs['clean'],
                            'auroc_vs_human_reference': aucs['human_reference'],
@@ -131,7 +134,7 @@ def core_report(run_dirs, controls_dir, output):
                'generated_samples': sum(len(rows) for _, _, rows in runs.values()),
                'reference_samples': len(next(iter(controls.values()))),
                'reference_controls_shared_across_strengths': True,
-               'comparison': comparison, 'groups': groups,
+               'comparison': comparison, 'groups': groups, 'detected_correctness': detected_quality,
                'scope': 'Descriptive results at a fixed threshold; no held-out tuning or causal entropy measurement.'}
     write_json(output / 'core_summary.json', summary)
     write_json(output / 'examples.json', examples)
@@ -139,6 +142,7 @@ def core_report(run_dirs, controls_dir, output):
     write_csv(output / 'detector_samples.csv', sample_rows)
     write_csv(output / 'length_analysis.csv', lengths)
     write_csv(output / 'quality_detection.csv', comparison)
+    write_csv(output / 'detected_correctness.csv', detected_quality)
     if roc_rows:
         write_csv(output / 'roc.csv', roc_rows)
     else:
@@ -190,6 +194,21 @@ def _write_report(output, summary, runs, lengths):
               '| Run | Group | Scored / total | Mean Z | Positive rate |', '|---|---|---|---|---|']
     for r in summary['groups']:
         lines.append(f"| {r['run']} | {r['condition']} | {r['scored']}/{r['samples']} | {number(r['mean_z'])} | {number(r['positive_rate'])} |")
+    lines += ['', '## Correctness among detected watermarked solutions', '',
+              'Detection means a valid code score strictly above the configured Z threshold. '
+              'It is a detector decision, not proof of how the code was generated.', '',
+              'Correctness among detected = test-passing detected solutions / detected solutions. '
+              'Correct and detected rate = test-passing detected solutions / all watermarked solutions. '
+              'The second denominator includes unscored outputs. No detected solutions makes conditional '
+              'correctness unavailable, not zero. Missing tests leave the affected rates pending; '
+              'correct counts below include only completed tests. Small detected groups are not reliable '
+              'estimates of general correctness.', '',
+              '| Strength | Z threshold | Detected / generated | Evaluated detected | Correct detected | Correctness among detected | Correct and detected rate |',
+              '|---|---|---|---|---|---|---|']
+    for r in summary['detected_correctness']:
+        lines.append(f"| {r['delta']:g} | > {r['threshold']:g} | {r['detected']}/{r['samples']} | "
+                     f"{r['evaluated_detected']} | {r['correct_detected']} | "
+                     f"{number(r['correctness_among_detected'])} | {number(r['correct_and_detected_rate'])} |")
     lines += ['', '## Code length', '',
               'Scored lengths are split into <50, 50–99, and 100+ bigrams. Empty bins remain unavailable. '
               'This is a descriptive association, not a measurement of model entropy.', '',
@@ -219,7 +238,7 @@ def _write_report(output, summary, runs, lengths):
               'strengths and shared references are not independent extra controls. A strength selected on '
               'these same tasks needs separate validation. Fingerprinting and robustness are outside this report.', '',
               '## Artifacts', '',
-              '`core_summary.json`, `detection_groups.csv`, `quality_detection.csv`, `detector_samples.csv`, '
+              '`core_summary.json`, `detection_groups.csv`, `quality_detection.csv`, `detected_correctness.csv`, `detector_samples.csv`, '
               '`roc.csv`, `length_analysis.csv`, `examples.json`, and `core_provenance.json`. '
               'Examples show the lowest/highest watermarked Z per run; they are not representative accuracy estimates.', '']
     (output / 'report.md').write_text('\n'.join(lines), encoding='utf-8')

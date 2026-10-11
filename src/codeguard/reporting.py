@@ -1,11 +1,31 @@
 """Run summaries. Missing evaluations never become zero Pass@1 by accident."""
 
 from collections import Counter
+import math
 from pathlib import Path
 import statistics
 
 from .evaluation import load_run
 from .storage import digest, read_records, run_lock, write_json
+
+
+def detected_correctness(rows, evaluations, threshold, expected):
+    """Correctness conditional on detection, with a separate joint success rate."""
+    scored = [row for row in rows if row.get('code_detection')
+              and row['code_detection'].get('status') == 'ok'
+              and isinstance(row['code_detection'].get('z_score'), (int, float))
+              and math.isfinite(row['code_detection']['z_score'])]
+    detected = [row for row in scored if row['code_detection']['z_score'] > threshold]
+    evaluated = [evaluations[row['sample_id']] for row in detected if row['sample_id'] in evaluations]
+    correct = sum(result['status'] == 'passed' for result in evaluated)
+    generated_all = len(rows) == expected
+    evaluated_all = generated_all and all(row['sample_id'] in evaluations for row in rows)
+    return {'threshold': threshold, 'samples': len(rows), 'scored': len(scored),
+            'detected': len(detected), 'evaluated_detected': len(evaluated),
+            'correct_detected': correct,
+            'correctness_among_detected': correct / len(detected)
+                if generated_all and detected and len(evaluated) == len(detected) else None,
+            'correct_and_detected_rate': correct / expected if evaluated_all and expected else None}
 
 
 def summarize(directory):
@@ -34,6 +54,8 @@ def summarize(directory):
                 "expected": expected, "generated": len(selected), "evaluated": sum(statuses.values()),
                 "evaluation_statuses": dict(statuses),
                 "pass_at_1": statuses["passed"] / expected if sum(statuses.values()) == expected else None,
+                "detected_correctness": detected_correctness(
+                    selected, indexed, manifest['config']['watermark']['z_threshold'], expected),
                 "syntax_valid": sum(row["extraction"]["status"] in ("ok", "missing_entrypoint") for row in selected),
                 "truncated": sum(row["finish_reason"] == "length" for row in selected),
                 "scored_samples": len(scores), "unscored_samples": len(selected) - len(scores),
