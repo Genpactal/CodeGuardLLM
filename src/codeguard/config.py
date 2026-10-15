@@ -65,13 +65,23 @@ def load_config(path):
     _number(generation["top_p"], "top_p", 0.0001, 1)
     _number(generation["max_new_tokens"], "max_new_tokens", 1, integer=True)
     wm = config["watermark"]
-    _keys(wm, ["gamma", "delta", "hash_key", "prefix_length", "f_scheme", "window_scheme", "z_threshold", "ignore_repeated_ngrams"])
+    _keys(wm, ["gamma", "delta", "hash_key", "prefix_length", "f_scheme", "window_scheme", "z_threshold", "ignore_repeated_ngrams"],
+          ["algorithm", "entropy_threshold"])
+    algorithm = wm.get('algorithm', 'KGW')
+    if algorithm not in ('KGW', 'SWEET'):
+        raise ValueError('watermark.algorithm must be KGW or SWEET')
+    if algorithm == 'SWEET':
+        if 'entropy_threshold' not in wm:
+            raise ValueError('SWEET requires watermark.entropy_threshold (in nats)')
+        _number(wm['entropy_threshold'], 'watermark.entropy_threshold', 0)
+    elif 'entropy_threshold' in wm:
+        raise ValueError('entropy_threshold is only supported for SWEET')
     _number(wm["gamma"], "gamma", 0.0001, 0.9999)
     _number(wm["delta"], "delta", 0)
     _number(wm["hash_key"], "hash_key", 1, 2**63 - 1, integer=True)
     _number(wm["z_threshold"], "z_threshold", 0)
     if (wm["prefix_length"], wm["f_scheme"], wm["window_scheme"]) != (1, "time", "left"):
-        raise ValueError("This project supports the single-token time/left KGW scheme only")
+        raise ValueError("This project supports only prefix_length=1 and time/left settings")
     if type(wm["ignore_repeated_ngrams"]) is not bool:
         raise ValueError("ignore_repeated_ngrams must be a boolean")
     evaluation = config["evaluation"]

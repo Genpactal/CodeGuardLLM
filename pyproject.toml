@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "codeguardllm"
 version = "0.1.0"
-description = "Reproducible KGW watermark experiments on Python code"
+description = "Reproducible KGW and SWEET watermark experiments on Python code"
 requires-python = ">=3.11"
 dependencies = ["PyYAML==6.0.2"]
 

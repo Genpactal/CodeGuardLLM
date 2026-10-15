@@ -4,12 +4,14 @@ import ast
 from contextlib import redirect_stdout
 import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
 from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 ARCHIVE_PATH = ROOT / 'notebooks/pilot_results.ipynb'
@@ -23,6 +25,21 @@ def source(identity):
 
 
 class NotebookTests(unittest.TestCase):
+    def test_colab_commands_use_headless_backend_without_changing_kernel(self):
+        for experiment in ('watermark_comparison_colab', 'sweet_comparison_colab'):
+            with self.subTest(notebook=experiment), tempfile.TemporaryDirectory() as folder:
+                notebook = json.loads((ROOT / f'notebooks/{experiment}.ipynb').read_text(encoding='utf-8'))
+                code = ''.join(next(c['source'] for c in notebook['cells'] if c['id'] == 'runner'))
+                namespace = dict(PROJECT=Path(folder), CHECKPOINT=None)
+                exec(code, namespace)
+                inline = 'module://matplotlib_inline.backend_inline'
+                with patch.dict(os.environ, {'MPLBACKEND': inline}), redirect_stdout(io.StringIO()):
+                    namespace['command']([
+                        sys.executable, '-c',
+                        "import os; assert os.environ['MPLBACKEND'] == 'Agg', os.environ['MPLBACKEND']",
+                    ], label='headless-backend')
+                    self.assertEqual(os.environ['MPLBACKEND'], inline)
+
     def test_local_generation_does_not_require_cuda(self):
         for experiment in ('watermark_comparison', 'attribution'):
             notebook = json.loads((ROOT / f'notebooks/{experiment}.ipynb').read_text(encoding='utf-8'))

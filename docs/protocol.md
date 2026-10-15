@@ -4,10 +4,22 @@
 
 Local notebooks use all 164 HumanEval test problems, pinned by dataset revision.
 Each setting produces 328 completions (one clean and one watermarked per task);
-three strengths or three models produce 984 completions per notebook. CPU and
-float32 remain fixed. Results use separate `runs/local/humaneval/` directories.
+three strengths or three models produce 984 completions per notebook. Local CPU
+runs use float32; GPU runs use explicit precision recorded in their manifests.
+Each runtime and algorithm has separate result directories.
 Tests and reference solutions are withheld from generation. Strength comparisons
 are descriptive; choosing a strength on these tasks is not held-out evaluation.
+
+SWEET uses `configs/sweet.yaml`: the same model, tasks, gamma=0.25, key and sampling
+settings as KGW, with an untuned entropy cutoff of 0.9 nats and delta 1, 2, 3.
+Generation uses pinned MarkLLM SWEET. Detection recomputes text-only entropy with
+cached 64-token chunks and FP32 arithmetic, then retains high-entropy positions
+and filters repeated bigrams by first occurrence. The first token is excluded;
+zero eligible positions are unscorable. The detector needs the model, including
+for reference controls. Native SWEET and KGW green-list seeding differs, so this
+is a comparison of implementations rather than entropy gating alone. Removed
+prompts and Markdown may affect early entropy estimates. Correctness remains a
+separate Docker test. No SWEET performance claim is made before the full run.
 
 The following records the earlier development pilot.
 

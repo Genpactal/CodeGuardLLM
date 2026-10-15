@@ -18,7 +18,7 @@ def reference_code(task):
 
 def control_protocol(manifest):
     watermark = deepcopy(manifest['config']['watermark'])
-    # Delta changes generation, not the text-only KGW detection rule.
+    # Delta changes generation, not the text-only KGW/SWEET detection rule.
     watermark.pop('delta')
     return {'schema_version': 1, 'tasks_sha256': manifest['tasks_sha256'],
             'backend': manifest['backend'], 'watermark': watermark,

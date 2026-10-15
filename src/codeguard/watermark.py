@@ -41,7 +41,7 @@ class KGWAdapter:
         if max(tokenizer.get_vocab().values()) >= vocab_size:
             raise ValueError("Tokenizer contains token IDs outside the model vocabulary")
         transformer_config = transformer_module.TransformersConfig(model, tokenizer, vocab_size=vocab_size, device=device)
-        upstream_config = {key: value for key, value in settings.items() if key != "ignore_repeated_ngrams"}
+        upstream_config = {key: value for key, value in settings.items() if key not in ("ignore_repeated_ngrams", "algorithm")}
         upstream_config["algorithm_name"] = "KGW"
         with tempfile.TemporaryDirectory(prefix="codeguard-kgw-") as temp:
             path = Path(temp) / "KGW.json"

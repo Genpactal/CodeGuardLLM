@@ -2,11 +2,15 @@
 
 from copy import deepcopy
 import json
+import os
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import unittest
 
 from codeguard.controls import load_reference_controls, reference_code, score_reference_controls
+from codeguard.config import load_config
 from codeguard.core_report import core_report, group_statistics, roc_statistics
 from codeguard.evaluation import evaluate_run, load_run
 from codeguard.experiments import comparison_configs
@@ -85,6 +89,24 @@ class ControlTests(unittest.TestCase):
             self.score(WrongEnvironment)
 
     @unittest.skipUnless(ANALYSIS_AVAILABLE, 'Install .[analysis]')
+    def test_analysis_cli_with_invalid_inherited_backend(self):
+        self.score()
+        # An invalid name reproduces the import-time failure of a missing Colab backend,
+        # even when matplotlib-inline happens to be installed in the test environment.
+        result = subprocess.run(
+            [sys.executable, 'scripts/compare_watermarks.py', 'analyze',
+             '--config', 'configs/pilot.yaml', '--output', str(self.root)],
+            cwd=ROOT, capture_output=True, text=True, timeout=60,
+            env={**os.environ, 'MPLBACKEND': 'unavailable_notebook_backend'},
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        output = self.root / 'analysis'
+        summary = json.loads((output / 'core_summary.json').read_text(encoding='utf-8'))
+        self.assertEqual(summary['status'], 'correctness_pending')
+        for name in ('detection.png', 'controls_detection.png', 'tradeoff.png'):
+            self.assertGreater((output / name).stat().st_size, 100)
+
+    @unittest.skipUnless(ANALYSIS_AVAILABLE, 'Install .[analysis]')
     def test_complete_report_and_pending_correctness(self):
         self.score()
         output = self.root / 'analysis'
@@ -104,6 +126,24 @@ class ControlTests(unittest.TestCase):
         self.assertTrue(all(r['correctness_among_detected'] is None for r in summary['detected_correctness']))
         for name in ('controls_detection.png', 'tradeoff.png', 'roc.csv', 'length_analysis.csv', 'examples.json', 'detected_correctness.csv'):
             self.assertGreater((output / name).stat().st_size, 10)
+
+    @unittest.skipUnless(ANALYSIS_AVAILABLE, 'Install .[analysis]')
+    def test_sweet_report_identifies_entropy_gate_and_separate_controls(self):
+        config = load_config(ROOT / 'configs/sweet.yaml')
+        config['dataset'] = deepcopy(next(iter(self.configs.values()))['dataset'])
+        config['output_dir'] = str(self.root / 'sweet/delta-2')
+        generate(config, ScoredBackend, progress=lambda _: None)
+        controls = self.root / 'sweet/controls'
+        score_reference_controls(config['output_dir'], controls, ROOT / '.deps/MarkLLM',
+                                 backend_factory=ScoredBackend, progress=lambda _: None)
+        summary = core_report({'delta-2': config['output_dir']}, controls, self.root / 'sweet/report')
+        self.assertEqual(summary['algorithm'], 'SWEET')
+        report = (self.root / 'sweet/report/report.md').read_text(encoding='utf-8')
+        self.assertIn('SWEET entropy threshold: 0.9 nats', report)
+        self.assertIn('Zero eligible tokens are unscorable', report)
+        manifest, tasks, _ = load_run(next(iter(self.paths.values())))
+        with self.assertRaisesRegex(ValueError, 'differ'):
+            load_reference_controls(controls, manifest, tasks)
 
 
 class DetectedCorrectnessTests(unittest.TestCase):

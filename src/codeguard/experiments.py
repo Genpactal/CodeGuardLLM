@@ -23,7 +23,8 @@ def comparison_configs(path, output):
     result = {}
     for delta in (1, 2, 3):
         config = deepcopy(base)
-        config["name"] = f"watermark_comparison-delta-{delta}"
+        prefix = 'sweet_comparison' if base['watermark'].get('algorithm') == 'SWEET' else 'watermark_comparison'
+        config["name"] = f"{prefix}-delta-{delta}"
         config["watermark"]["delta"] = float(delta)
         config["output_dir"] = str(Path(output).resolve() / f"delta-{delta}")
         result[f"delta-{delta}"] = config

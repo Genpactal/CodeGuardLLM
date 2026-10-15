@@ -20,6 +20,9 @@ class HFBackend:
         except ImportError as exc:
             raise RuntimeError("Install model dependencies: pip install -e '.[ml]'") from exc
         self.config = config
+        algorithm = config['watermark'].get('algorithm', 'KGW')
+        if algorithm not in ('KGW', 'SWEET'):
+            raise ValueError(f'Unsupported watermark algorithm: {algorithm}')
         spec = config["model"]
         self.device = spec["device"]
         if self.device == "cuda" and not torch.cuda.is_available():
@@ -28,14 +31,19 @@ class HFBackend:
         self.tokenizer = AutoTokenizer.from_pretrained(spec["name"], **common)
         model_config = AutoConfig.from_pretrained(spec["name"], **common)
         self.model = None
-        if load_model:
+        # SWEET also needs model probabilities when used only as a detector.
+        if load_model or algorithm == 'SWEET':
             self.model = AutoModelForCausalLM.from_pretrained(
                 spec["name"], torch_dtype=getattr(torch, spec["dtype"]), use_safetensors=True,
                 attn_implementation="eager", **common,
             ).to(self.device).eval()
             if self.model.get_output_embeddings().weight.shape[0] != model_config.vocab_size:
                 raise RuntimeError("Output vocabulary differs from the model configuration")
-        self.watermark = KGWAdapter(config["markllm_path"], config["watermark"], self.tokenizer,
+        adapter = KGWAdapter
+        if algorithm == 'SWEET':
+            from .sweet import SWEETAdapter
+            adapter = SWEETAdapter
+        self.watermark = adapter(config["markllm_path"], config["watermark"], self.tokenizer,
                                     model_config.vocab_size, self.device, self.model)
         self.metadata = {
             "backend": "huggingface-markllm", "model": spec["name"], "revision": spec["revision"],
@@ -47,6 +55,10 @@ class HFBackend:
             "gpu": torch.cuda.get_device_name() if self.device == "cuda" else None,
             "prompt_template_hash": digest([SYSTEM_PROMPT, USER_PREFIX]),
         }
+        if algorithm == 'SWEET':
+            self.metadata.update(algorithm='SWEET', detector_version=1,
+                                 entropy_context='text-only; no prompt; first token unscored',
+                                 entropy_precision='float32', entropy_chunk_size=64)
 
     def generate(self, prompt, task_id, seed, condition):
         import torch

@@ -1,5 +1,6 @@
 .venv/
 .venv-gpu/
+.venv-colab/
 .deps/
 .tmp/
 __pycache__/

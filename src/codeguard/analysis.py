@@ -7,6 +7,7 @@ from pathlib import Path
 import statistics
 
 from .evaluation import load_run
+from .plotting import report_pyplot
 from .reporting import summarize
 from .storage import digest, write_json
 
@@ -66,9 +67,7 @@ def detection_statistics(rows, threshold):
 
 
 def detection_report(run_dirs, output):
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+    plt = report_pyplot()
     from sklearn.metrics import roc_curve
 
     runs = complete_runs(run_dirs)
@@ -198,9 +197,7 @@ def attribution_report(run_dirs, output, markllm_path, threshold=4.0, backend_fa
     write_csv(output / "scores.csv", flattened)
     write_json(output / "provenance.json", {label: {"experiment_id": m["experiment_id"], "records_sha256": digest(rows)}
                                            for label, (m, _, rows) in runs.items()})
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+    plt = report_pyplot()
     columns = [*runs, "unknown"]
     fig, axes = plt.subplots(1, 2, figsize=(13, 5))
     for ax, field, title in zip(axes, ("forced_confusion_matrix", "confusion_matrix"),

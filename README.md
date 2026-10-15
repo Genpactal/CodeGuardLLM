@@ -1,6 +1,6 @@
 # CodeGuardLLM
 
-Experiments with KGW watermarks in Python code: generation, watermark detection,
+Experiments with KGW and SWEET watermarks in Python code: generation, watermark detection,
 correctness evaluation, human-reference controls, and research reporting. The project uses
 Hugging Face models and a pinned MarkLLM implementation.
 
@@ -9,7 +9,8 @@ Hugging Face models and a pinned MarkLLM implementation.
 | Notebook | Purpose |
 |---|---|
 | `notebooks/watermark_comparison.ipynb` | Full core workflow: generation, reference controls, Docker correctness, plots, written report |
-| `notebooks/watermark_comparison_colab.ipynb` | Colab GPU generation, reference scoring, reports, and Drive checkpoints |
+| `notebooks/watermark_comparison_colab.ipynb` | KGW on Colab: generation, reference scoring, reports, and Drive checkpoints |
+| `notebooks/sweet_comparison_colab.ipynb` | SWEET on Colab through VS Code, with separate results and checkpoints |
 
 For local work, open the comparison notebook in VS Code and select
 **Select Kernel → Python Environments → .venv\Scripts\python.exe**. Run the cells
@@ -110,6 +111,64 @@ Expand-Archive -LiteralPath "$env:USERPROFILE\Downloads\codeguard-colab-results.
 Evaluation uses the saved task snapshots and experiment manifests. It does not
 load the model or redo GPU detection. The final report is
 `runs/colab-import/watermark_comparison/analysis/report.md`.
+
+## SWEET on Colab through VS Code
+
+`notebooks/sweet_comparison_colab.ipynb` runs the same Qwen 1.5B model on all 164
+HumanEval tasks, with clean and watermarked generation at delta 1, 2, and 3 (984
+completions). The new `configs/sweet.yaml` selects SWEET explicitly. KGW configs,
+existing notebooks, and saved KGW runs keep their original identities.
+
+1. Open the SWEET notebook in VS Code and select **Colab > New Colab Server > GPU**.
+2. Right-click `.tmp/codeguard-sweet-colab.zip` in Explorer and select **Upload to
+   Colab**, then run the notebook from the top. This archive is prepared locally;
+   after cloning or changing the project, rebuild it with:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/package_colab.py --sweet
+```
+
+The notebook extracts into `/content/CodeGuardLLM-SWEET`, checks generation and
+scoring on two short setup examples, and installs packages in its own environment.
+Setup examples are not included in the experiment. GPU precision is bfloat16 where
+natively supported, otherwise float32. Drive checkpoints are stored under
+`MyDrive/CodeGuardLLM/colab-sweet/<runtime-and-config-id>/results.zip`; changed
+settings or hardware get a separate folder. Keep only one writer per run.
+
+[SWEET](https://arxiv.org/abs/2305.15060) applies the green-token bias only above an
+entropy cutoff. We use the [pinned MarkLLM implementation](https://github.com/THU-BPM/MarkLLM/blob/0a4fe8c642b31b8a8c4993615b1c70a0c300d918/watermark/sweet/sweet.py)
+with gamma 0.25, entropy cutoff 0.9 nats (an untuned upstream default), and Z > 4.
+The generation model and sampling settings match the KGW configuration. The native
+SWEET green-list seeding differs from native KGW; this compares implementations,
+not a controlled change of entropy gating alone.
+
+SWEET detection loads Qwen to estimate entropy. It uses cached 64-token chunks to
+bound vocabulary-logit memory and FP32 entropy arithmetic. The project applies its
+existing repeated-bigram filter: only the first occurrence can contribute, and it
+must exceed the entropy cutoff. This filtering extends upstream SWEET. Empty,
+one-token, and zero-eligible-token outputs remain unscored instead of crashing or
+being labelled negative. The first token is never scored. Detection receives only
+the supplied text; removing prompts and Markdown can change early entropy gates.
+Recorded eligible-token counts describe this detector, not an entropy measurement
+of the original generation context.
+
+Reference controls are rescored using SWEET and its model. They cannot reuse KGW
+scores. ROC/AUROC, score distributions, Pass@1, correctness among detected solutions,
+and joint correct-and-detected rates use the same report pipeline. No improved
+performance is claimed before the full experiment. Compare methods at calibrated,
+matched false-alarm rates; a common Z threshold alone does not ensure equal rates.
+
+The export cell creates `/content/codeguard-sweet-results.zip`. Download it through
+**Colab > Contents > Download...** and evaluate on the laptop with Docker:
+
+```powershell
+Expand-Archive -LiteralPath "$env:USERPROFILE\Downloads\codeguard-sweet-results.zip" -DestinationPath runs/sweet-import
+.\.venv\Scripts\python.exe scripts/compare_watermarks.py evaluate --config configs/sweet.yaml --output runs/sweet-import/sweet_comparison
+.\.venv\Scripts\python.exe scripts/compare_watermarks.py analyze --config configs/sweet.yaml --output runs/sweet-import/sweet_comparison
+```
+
+These two laptop steps use saved scores and do not load Qwen. Pass@1 and detected
+correctness stay pending in Colab until Docker evaluation is available.
 
 ## Installation
 

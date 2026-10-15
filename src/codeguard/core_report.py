@@ -6,6 +6,7 @@ import statistics
 
 from .analysis import complete_runs, detection_report, valid_score, write_csv
 from .controls import load_reference_controls
+from .plotting import report_pyplot
 from .reporting import summarize
 from .storage import digest, write_json
 
@@ -32,9 +33,7 @@ def roc_statistics(negative, positive):
 
 
 def core_report(run_dirs, controls_dir, output):
-    import matplotlib
-    matplotlib.use('Agg')
-    import matplotlib.pyplot as plt
+    plt = report_pyplot()
 
     runs = complete_runs(run_dirs)
     controls = {}
@@ -131,6 +130,7 @@ def core_report(run_dirs, controls_dir, output):
     plt.close(fig)
 
     summary = {'status': 'complete' if quality_complete else 'correctness_pending',
+               'algorithm': next(iter(runs.values()))[0]['config']['watermark'].get('algorithm', 'KGW'),
                'generated_samples': sum(len(rows) for _, _, rows in runs.values()),
                'reference_samples': len(next(iter(controls.values()))),
                'reference_controls_shared_across_strengths': True,
@@ -162,6 +162,19 @@ def _write_report(output, summary, runs, lengths):
     first = next(iter(runs.values()))[0]
     config = first['config']
     wm = config['watermark']
+    algorithm = wm.get('algorithm', 'KGW')
+    scheme = 'MarkLLM SWEET previous-token hash' if algorithm == 'SWEET' else f"{wm['f_scheme']}/{wm['window_scheme']}"
+    token_rule = ('T counts high-entropy positions after the configured repeated-bigram filtering. '
+                  if algorithm == 'SWEET' else 'T counts positions after the configured repeated-bigram filtering. ')
+    entropy_note = (f"SWEET entropy threshold: {wm['entropy_threshold']} nats (untuned). "
+                    'Entropy is recomputed from the supplied text only, using the same model and '
+                    'FP32 entropy arithmetic with cached 64-token chunks. The original generation prompt '
+                    'and removed Markdown are unavailable to the code detector, so early entropy gates '
+                    'may differ from generation. Zero eligible tokens are unscorable, never negative. '
+                    'Repeated-bigram filtering is a project extension to upstream SWEET: only the first '
+                    'occurrence can be scored. SWEET and KGW use different upstream green-list seeding rules. '
+                    '[SWEET paper](https://arxiv.org/abs/2305.15060).'
+                    if algorithm == 'SWEET' else '')
     lines = ['# CodeGuardLLM: core experiment', '',
              f"Status: **{summary['status']}**. {summary['generated_samples']} generated completions; "
              f"{summary['reference_samples']} distinct reference controls shared across strengths.", '',
@@ -171,11 +184,12 @@ def _write_report(output, summary, runs, lengths):
              f"Dataset: `{config['dataset'].get('name', 'project development fixtures')}`; "
              f"revision `{config['dataset'].get('revision', 'local snapshot')}`. "
              'Only task prompts entered generation. Tests and reference solutions were withheld.', '',
-             f"KGW gamma={wm['gamma']}, fixed Z > {wm['z_threshold']}, key={wm['hash_key']}, "
-             f"scheme={wm['f_scheme']}/{wm['window_scheme']}, repeated-bigram filtering={wm['ignore_repeated_ngrams']}.", '',
+             f"{algorithm} gamma={wm['gamma']}, fixed Z > {wm['z_threshold']}, key={wm['hash_key']}, "
+             f"scheme={scheme}, repeated-bigram filtering={wm['ignore_repeated_ngrams']}.", '',
+             entropy_note, '',
              f"Sampling: {config['generation']}. Model and runtime details are preserved in run manifests.", '',
              'Z = (green_count - gamma × T) / sqrt(T × gamma × (1 - gamma)). '
-             'T counts scored distinct bigrams here; the first token is unscored. '
+             + token_rule + 'The first token is unscored. '
              'Generated code is scored without prepending its prompt. HumanEval references use the complete '
              'prompt + canonical_solution, retaining imports, signature and docstrings; this representation '
              'can differ from generated code.', '',
