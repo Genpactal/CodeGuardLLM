@@ -265,10 +265,62 @@ a fixed dataset revision in `configs/local.yaml`, using CPU and float32.
 The three strengths are compared descriptively; selecting the best one on these
 same tasks does not produce an independent held-out result. Threshold calibration,
 repeated seeds, confidence intervals, and an independent human-code corpus remain
-possible follow-up work. Fingerprinting and robustness are excluded from the core
-workflow. Earlier attribution files are retained as a deferred prototype and are
+possible follow-up work. Robustness is a separate follow-up experiment described below.
+Fingerprinting is excluded from the core workflow. Earlier attribution files are retained as a deferred prototype and are
 not required for this project stage.
 Tests and reference solutions never enter generation prompts.
+
+## Robustness of saved code
+
+Open `notebooks/robustness.ipynb` to prepare and inspect attacks across the three SWEET
+strengths. The notebook keeps scoring and Docker evaluation opt-in because they can
+take time. The same CLI supports saved KGW runs. No solutions are regenerated.
+
+Each source sample, clean and watermarked, gets an unchanged identity baseline plus
+four deterministic attacks: comment removal, AST formatting normalization, docstring
+removal, and conservative local-variable renaming. Renaming preserves parameters and
+function names and skips nested scopes, comprehensions, imports, exception bindings,
+pattern matching, f-strings, and direct reflection calls. Skipped/no-op attacks and
+invalid code remain explicit. Docstring removal and renaming also apply AST formatting;
+use the `reformat` arm to distinguish this shared effect. Test passing is required to
+claim a correctness-preserving evasion; transformations are not assumed equivalent.
+
+For one saved strength, run these steps from the project root:
+
+```powershell
+$robustnessRun = 'runs/sweet-import/0eedc6730e049860/sweet_comparison/delta-3'
+.\.venv-gpu\Scripts\python.exe scripts/robustness.py prepare --run-dir $robustnessRun
+.\.venv-gpu\Scripts\python.exe scripts/robustness.py score --run-dir $robustnessRun
+.\.venv\Scripts\python.exe scripts/robustness.py evaluate --run-dir $robustnessRun
+.\.venv\Scripts\python.exe scripts/robustness.py analyze --run-dir $robustnessRun
+```
+
+Start Docker Desktop for `evaluate`. `score` needs the ML dependencies and pinned
+MarkLLM checkout; SWEET loads the generation model to recompute entropy. Defaults use
+the saved model/device/precision. For a deliberate CPU run, use `--device cpu --dtype
+float32`. Identity and attacked code are both rescored in the new detector environment;
+original generation scores are not mixed into comparisons. Saved scoring metadata
+prevents resuming with changed settings or a changed detector environment. A completed
+score stage can be reused without loading the model. `run` performs all four stages.
+
+Artifacts are kept under `RUN_DIR/robustness` (or `--output`): frozen variants, source
+hashes, detector/evaluator manifests, resumable scores and evaluations, JSON/CSV
+summaries, `report.md`, and a plot when both stages finish. Source files remain intact.
+Preparing variants records the Python version because AST rendering can differ across
+versions; later scoring/evaluation/reporting can run elsewhere on the frozen variants.
+Keep the source run and its `robustness` folder together when transferring machines.
+
+Reports include matched-clean AUROC, detection retention, paired Z-score changes,
+Pass@1, and correctness retention. Correct evasion requires a baseline that both
+passes and is detected, a changed candidate that still passes, and a valid attacked
+score at or below the fixed threshold. Unscored code is never counted as an evasion.
+Zero eligible baselines gives an unavailable rate, not a successful attack. Missing
+stages remain pending, and no-op/failed attacks stay in denominators. This suite does
+not cover adaptive or LLM-assisted rewriting, and small detected subsets remain weak
+evidence even when a reported rate is high.
+
+The format transformation uses Python's [AST unparser](https://docs.python.org/3/library/ast.html#ast.unparse).
+Comments are located with the [Python tokenizer](https://docs.python.org/3/library/tokenize.html).
 
 ## Project structure
 

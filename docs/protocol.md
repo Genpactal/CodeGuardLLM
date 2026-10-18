@@ -21,6 +21,19 @@ is a comparison of implementations rather than entropy gating alone. Removed
 prompts and Markdown may affect early entropy estimates. Correctness remains a
 separate Docker test. No SWEET performance claim is made before the full run.
 
+Robustness is a separate paired experiment on frozen saved code, implemented by
+`scripts/robustness.py`. Identity, comment removal, AST reformatting, docstring removal,
+and conservative local-variable renaming are applied to both clean and watermarked
+samples. Identity and attacked variants are rescored together with recorded detector
+metadata. The original generation detector scores are not reused. Docker validates
+canonical references before evaluating variants. A successful evasion requires an
+originally correct and detected sample, an actually changed and still-correct variant,
+and a valid attacked score at or below the unchanged threshold. Unscored variants do
+not establish evasion. Report applicability, no-op/error counts, baseline eligible
+counts, and missing stages alongside rates. AST-based edits share formatting changes;
+compare with the reformat arm. No adaptive attack or semantic-equivalence guarantee is
+claimed. Original experiments and their core summaries remain separate.
+
 The following records the earlier development pilot.
 
 The implemented core workflow includes reference-code detection, ROC/AUROC against
@@ -28,7 +41,7 @@ clean and reference negatives, Docker Pass@1, strength/quality plots, scored-len
 groups, and a written report. Reference controls are complete prompt-plus-canonical
 solutions, retaining docstrings. They are scored once per dataset/detector and
 shared across delta values, without pretending they are independent observations.
-Fingerprinting and robustness are deferred. A report is marked complete only after
+At that stage, fingerprinting and robustness were deferred. A report is marked complete only after
 generation, controls, and all correctness evaluations are complete.
 
 ## Question and scope
