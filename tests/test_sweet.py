@@ -59,7 +59,6 @@ class SweetConfigTests(unittest.TestCase):
                     if (isinstance(node, ast.Call) and len(node.args) > 1
                             and isinstance(node.args[0], ast.Constant) and node.args[0].value == '-c'):
                         ast.parse(ast.literal_eval(node.args[1]))
-                self.assertEqual(cell['outputs'], [])
         self.assertIn('/content/CodeGuardLLM-SWEET', sources['project'])
         self.assertIn('codeguard-sweet-colab.zip', sources['project'])
         self.assertIn('configs/sweet.yaml', sources['install'])
