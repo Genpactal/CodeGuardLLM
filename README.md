@@ -11,6 +11,7 @@ Hugging Face models and a pinned MarkLLM implementation.
 | `notebooks/watermark_comparison.ipynb` | Full core workflow: generation, reference controls, Docker correctness, plots, written report |
 | `notebooks/watermark_comparison_colab.ipynb` | KGW on Colab: generation, reference scoring, reports, and Drive checkpoints |
 | `notebooks/sweet_comparison_colab.ipynb` | SWEET on Colab through VS Code, with separate results and checkpoints |
+| `notebooks/watermark_tuning_colab.ipynb` | Matched KGW/SWEET pilot with shared clean outputs, calibration, and a parameter sweep |
 
 For local work, open the comparison notebook in VS Code and select
 **Select Kernel → Python Environments → .venv\Scripts\python.exe**. Run the cells
@@ -170,6 +171,52 @@ Expand-Archive -LiteralPath "$env:USERPROFILE\Downloads\codeguard-sweet-results.
 These two laptop steps use saved scores and do not load Qwen. Pass@1 and detected
 correctness stay pending in Colab until Docker evaluation is available.
 
+## Matched KGW and SWEET tuning on Colab
+
+Open `notebooks/watermark_tuning_colab.ipynb` in VS Code and select a Colab GPU
+kernel. Upload `.tmp/codeguard-tuning-colab.zip` through Explorer's **Upload to
+Colab** action, then run the cells in order. Rebuild the upload after source changes:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/package_colab.py --tuning
+```
+
+The default pilot uses 64 deterministically selected HumanEval tasks and one seed.
+It runs nine configurations: KGW gamma 0.1, 0.25, and 0.5 at delta 2; SWEET entropy
+cutoffs 0.3, 0.6, 0.9, and 1.2 at delta 2, plus delta 1 and 3 at cutoff 0.9.
+All use the same model, GPU, precision, prompts, and sampling settings. Clean code
+is generated once per task/seed and scored separately by each detector: 64 clean
+plus 576 watermarked completions. Repeated clean records are not extra independent
+controls. `PROFILE='full'` expands to 17 configurations in a separate run.
+
+32 task IDs calibrate each detector's threshold using clean and reference scores;
+32 different task IDs measure selection performance. The empirical calibration
+target is 5% false positives in each scorable control group. This small pilot does
+not guarantee a population false-positive rate. HumanEval has already been studied
+in this project, so these are exploratory results, not an independent final test.
+Generation and detection still use the existing native KGW/SWEET implementations;
+the detector-context diagnostic and later temperature experiments are not included
+in this first sweep.
+
+The notebook checkpoints under `MyDrive/CodeGuardLLM/colab-tuning/<run-id>` and
+exports `/content/codeguard-tuning-results.zip`. Resume with the same upload,
+settings, and runtime; keep one writer per run. Changed source archives, runtime,
+or settings get a different run ID. Correctness stays pending in Colab.
+Download the results, start Docker Desktop's Linux engine, and run locally:
+
+```powershell
+Expand-Archive -LiteralPath "$env:USERPROFILE\Downloads\codeguard-tuning-results.zip" -DestinationPath runs/tuning-import
+.\.venv\Scripts\python.exe scripts/tune_watermarks.py evaluate --output runs/tuning-import/watermark_tuning
+.\.venv\Scripts\python.exe scripts/tune_watermarks.py analyze --output runs/tuning-import/watermark_tuning
+```
+
+Use a new extraction directory for each imported run. The report is
+`runs/tuning-import/watermark_tuning/analysis/report.md`. Once selection correctness
+is complete, it proposes one configuration per method by joint correctness and
+detection, allowing at most a five-percentage-point correctness loss. A shortlist
+still needs confirmation with multiple seeds and frozen settings/thresholds on an
+independent benchmark. Local evaluation uses saved scores and requires no GPU.
+
 ## Installation
 
 Use Python 3.11 or 3.12 and Git. From the project root in PowerShell:
@@ -272,9 +319,12 @@ Tests and reference solutions never enter generation prompts.
 
 ## Robustness of saved code
 
-Open `notebooks/robustness.ipynb` to prepare and inspect attacks across the three SWEET
-strengths. The notebook keeps scoring and Docker evaluation opt-in because they can
-take time. The same CLI supports saved KGW runs. No solutions are regenerated.
+Open `notebooks/robustness.ipynb` for SWEET or
+`notebooks/kgw_robustness.ipynb` for KGW, each covering strengths 1, 2, and 3.
+The KGW notebook defaults to saved runs in `runs/gpu/humaneval/watermark_comparison`;
+change `RUN_ROOT` for a different location. Enable `RUN_SCORING` and
+`RUN_CORRECTNESS` to populate detection and correctness results; skipped stages
+remain pending. Correctness runs in Docker. No solutions are regenerated.
 
 Each source sample, clean and watermarked, gets an unchanged identity baseline plus
 four deterministic attacks: comment removal, AST formatting normalization, docstring

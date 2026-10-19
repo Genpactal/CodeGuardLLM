@@ -6,9 +6,11 @@ from pathlib import Path
 import zipfile
 
 
-def package(root, output, sweet=False):
+def package(root, output, sweet=False, tuning=False):
     root, output = Path(root), Path(output)
-    prefix = 'CodeGuardLLM-SWEET' if sweet else 'CodeGuardLLM'
+    if sweet and tuning:
+        raise ValueError('Choose one Colab workflow')
+    prefix = 'CodeGuardLLM-TUNING' if tuning else 'CodeGuardLLM-SWEET' if sweet else 'CodeGuardLLM'
     files = [root / 'pyproject.toml', root / 'README.md']
     for folder in ('src', 'scripts', 'configs', 'sandbox', 'data', 'docs', 'tests', 'notebooks'):
         files.extend(p for p in (root / folder).rglob('*') if p.is_file()
@@ -32,8 +34,10 @@ def package(root, output, sweet=False):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--sweet', action='store_true')
+    workflow = parser.add_mutually_exclusive_group()
+    workflow.add_argument('--sweet', action='store_true')
+    workflow.add_argument('--tuning', action='store_true')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
-    name = 'codeguard-sweet-colab.zip' if args.sweet else 'codeguard-colab.zip'
-    print(package(root, root / '.tmp' / name, sweet=args.sweet))
+    name = 'codeguard-tuning-colab.zip' if args.tuning else 'codeguard-sweet-colab.zip' if args.sweet else 'codeguard-colab.zip'
+    print(package(root, root / '.tmp' / name, sweet=args.sweet, tuning=args.tuning))

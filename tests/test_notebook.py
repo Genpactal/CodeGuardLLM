@@ -26,7 +26,7 @@ def source(identity):
 
 class NotebookTests(unittest.TestCase):
     def test_colab_commands_use_headless_backend_without_changing_kernel(self):
-        for experiment in ('watermark_comparison_colab', 'sweet_comparison_colab'):
+        for experiment in ('watermark_comparison_colab', 'sweet_comparison_colab', 'watermark_tuning_colab'):
             with self.subTest(notebook=experiment), tempfile.TemporaryDirectory() as folder:
                 notebook = json.loads((ROOT / f'notebooks/{experiment}.ipynb').read_text(encoding='utf-8'))
                 code = ''.join(next(c['source'] for c in notebook['cells'] if c['id'] == 'runner'))

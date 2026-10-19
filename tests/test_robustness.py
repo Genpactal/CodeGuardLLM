@@ -28,17 +28,27 @@ EXAMPLE = '''def answer(n=5):
 
 class TransformationTests(unittest.TestCase):
     def test_notebook_cells_compile_and_expensive_stages_are_opt_in(self):
-        nb = json.loads((ROOT / 'notebooks/robustness.ipynb').read_text(encoding='utf-8'))
-        cells = {c['id']: ''.join(c['source']) for c in nb['cells']}
-        for cell in nb['cells']:
-            if cell['cell_type'] == 'code':
-                ast.parse(''.join(cell['source']))
-        calls = []
-        namespace = dict(RUN_SCORING=False, RUN_CORRECTNESS=False, RUN_DIRS=['source'],
-                         SCORE_OPTIONS=[], run=lambda *a: calls.append(a))
-        exec(cells['score'], namespace)
-        exec(cells['evaluate'], namespace)
-        self.assertEqual(calls, [])
+        for filename in ('robustness.ipynb', 'kgw_robustness.ipynb'):
+            with self.subTest(notebook=filename):
+                nb = json.loads((ROOT / 'notebooks' / filename).read_text(encoding='utf-8'))
+                cells = {c['id']: ''.join(c['source']) for c in nb['cells']}
+                for cell in nb['cells']:
+                    if cell['cell_type'] != 'code':
+                        continue
+                    source = ''.join(cell['source'])
+                    if any(line.lstrip().startswith(('%', '!')) for line in source.splitlines()):
+                        try:
+                            from IPython.core.inputtransformer2 import TransformerManager
+                        except ImportError:
+                            self.skipTest('Install the notebook extra to validate IPython syntax')
+                        source = TransformerManager().transform_cell(source)
+                    ast.parse(source)
+                calls = []
+                namespace = dict(RUN_SCORING=False, RUN_CORRECTNESS=False, RUN_DIRS=['source'],
+                                 SCORE_OPTIONS=[], run=lambda *a: calls.append(a))
+                exec(cells['score'], namespace)
+                exec(cells['evaluate'], namespace)
+                self.assertEqual(calls, [])
 
     def test_transformations_preserve_authored_fixture_signature_and_outputs(self):
         # Only this authored fixture is executed here; saved model code uses Docker.
